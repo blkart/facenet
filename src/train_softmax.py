@@ -34,6 +34,7 @@ import random
 import tensorflow as tf
 import numpy as np
 import importlib
+import json
 import argparse
 import facenet
 import lfw
@@ -257,9 +258,22 @@ def main(args):
 
                 print('Saving statistics')
                 with h5py.File(stat_file_name, 'w') as f:
-                    for key, value in stat.iteritems():
+                    for key, value in stat.items():
                         f.create_dataset(key, data=value)
     
+    #kubeflow pipeline Artifacts for tensorboard
+    metadata = {
+        'outputs' : [{
+        'type': 'tensorboard',
+        'source': args.logs_base_dir,
+      }]
+    }
+    with open('/mlpipeline-ui-metadata.json', 'w') as f:
+      json.dump(metadata, f)
+
+    with open('/output.txt', 'w') as f:
+      f.write(args.logs_base_dir)
+
     return model_dir
   
 def find_threshold(var, percentile):
@@ -453,6 +467,15 @@ def evaluate(sess, enqueue_op, image_paths_placeholder, labels_placeholder, phas
         f.write('%d\t%.5f\t%.5f\n' % (step, np.mean(accuracy), val))
     stat['lfw_accuracy'][epoch-1] = np.mean(accuracy)
     stat['lfw_valrate'][epoch-1] = val
+    metrics = {
+        'metrics': [{
+          'name': 'accuracy-score',
+          'numberValue': np.mean(accuracy),
+          'format': "PERCENTAGE",
+        }]
+      }
+    with open('/mlpipeline-metrics.json', 'w') as f:
+      json.dump(metrics, f)
 
 def save_variables_and_metagraph(sess, saver, summary_writer, model_dir, model_name, step):
     # Save the model checkpoint
